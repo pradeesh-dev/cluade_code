@@ -1,0 +1,50 @@
+repos:
+  # Basic repository hygiene
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: mixed-line-ending
+      - id: detect-private-key
+      - id: check-added-large-files
+
+  # Secret scanning
+  # - repo: local
+  #   hooks:
+  #     - id: gitleaks
+  #       name: gitleaks
+  #       entry: gitleaks detect --staged --no-banner
+  #       language: system
+  #       pass_filenames: false
+
+  # Security scanning
+  #- repo: https://github.com/semgrep/pre-commit
+   # rev: v1.130.0
+   # hooks:
+   #   - id: semgrep
+    #    args:
+    #      - --config=p/security-audit
+    #      - --error
+
+  # Python linting and formatting
+  # - repo: https://github.com/astral-sh/ruff-pre-commit
+  #   rev: v0.12.0
+  #   hooks:
+  #     - id: ruff-check
+  #       args:
+  #         - --fix
+  #     - id: ruff-format
+
+  # # Type checking
+  # - repo: local
+  #   hooks:
+  #     - id: mypy
+  #       name: mypy
+  #       entry: mypy .
+  #       language: system
+  #       pass_filenames: false
