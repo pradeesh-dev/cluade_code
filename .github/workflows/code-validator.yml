@@ -54,7 +54,7 @@ jobs:
         run: mypy .
 
       - name: Semgrep Security Scan
-        run: semgrep scan --config=auto --error
+        run: semgrep scan --config=auto --error --timeout=120 --max-findings=100
 
       - name: Bandit Security Scan
         run: bandit -r .
@@ -62,11 +62,8 @@ jobs:
       # - name: Dependency Audit
       #   run: pip-audit
 
-      - name: Run Tests
-        run: pytest
-
-      - name: Run Coverage
-        run: pytest --cov=. --cov-report=term
+      - name: Run Tests with Coverage
+        run: pytest --cov=. --cov-report=term --cov-report=xml
 
   gitleaks:
     runs-on: ubuntu-latest
@@ -97,30 +94,66 @@ jobs:
           severity: HIGH,CRITICAL
           exit-code: "1"
 
+      - name: Trivy MEDIUM Scan (informational)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: MEDIUM
+          exit-code: "0"   # doesn't fail, just reports
+
   codeql:
+      runs-on: ubuntu-latest
+
+      permissions:
+        contents: read
+        security-events: write
+        actions: read
+
+      strategy:
+        matrix:
+          language:
+            - python
+
+      steps:
+        - name: Checkout Repository
+          uses: actions/checkout@v4
+
+        - name: Initialize CodeQL
+          uses: github/codeql-action/init@v3
+          with:
+            languages: ${{ matrix.language }}
+
+        - name: Perform CodeQL Analysis
+          uses: github/codeql-action/analyze@v3
+
+  create-pr:
+    name: Create PR to Main
+    needs:
+      - quality-and-security
+      - gitleaks
+      - trivy
+      - codeql
+
     runs-on: ubuntu-latest
 
-    permissions:
-      contents: read
-      security-events: write
-      actions: read
+    if: github.ref == 'refs/heads/staging'
 
-    strategy:
-      matrix:
-        language:
-          - python
+    permissions:
+      contents: write
+      pull-requests: write
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: ${{ matrix.language }}
-
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+      - name: Create Pull Request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr create \
+            --base main \
+            --head staging \
+            --title "Merge staging into main" \
+            --body "Automated PR after all checks passed." \
+            || echo "PR already exists"
