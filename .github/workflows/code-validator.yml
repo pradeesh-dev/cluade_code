@@ -1,0 +1,160 @@
+name: Code Validation
+
+on:
+  pull_request:
+  push:
+    branches:
+      - staging
+      - main
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  quality-and-security:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+
+          pip install \
+            ruff \
+            mypy \
+            semgrep \
+            bandit \
+            pip-audit \
+            pytest \
+            pytest-cov
+
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+
+      - name: Ruff Lint
+        run: ruff check .
+
+      - name: Ruff Format Check
+        run: ruff format --check .
+
+      - name: MyPy Type Checking
+        run: mypy .
+
+      - name: Semgrep Security Scan
+        run: semgrep scan --config=auto --error
+
+      - name: Bandit Security Scan
+        run: bandit -r .
+
+      # - name: Dependency Audit
+      #   run: pip-audit
+
+      - name: Run Tests with Coverage
+        run: pytest --cov=. --cov-report=term --cov-report=xml
+
+  gitleaks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks Scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  trivy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Trivy Filesystem Scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+
+      - name: Trivy MEDIUM Scan (informational)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: MEDIUM
+          exit-code: "0"   # doesn't fail, just reports
+
+  codeql:
+      runs-on: ubuntu-latest
+
+      permissions:
+        contents: read
+        security-events: write
+        actions: read
+
+      strategy:
+        matrix:
+          language:
+            - python
+
+      steps:
+        - name: Checkout Repository
+          uses: actions/checkout@v4
+
+        - name: Initialize CodeQL
+          uses: github/codeql-action/init@v3
+          with:
+            languages: ${{ matrix.language }}
+
+        - name: Perform CodeQL Analysis
+          uses: github/codeql-action/analyze@v3
+
+# Create Pull Request only after all jobs completed successfully
+  create-pr:
+    name: Create PR to Main
+    needs:
+      - quality-and-security
+      - gitleaks
+      - trivy
+      - codeql
+
+    runs-on: ubuntu-latest
+
+    if: github.ref == 'refs/heads/staging'
+
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Create Pull Request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr create \
+            --base main \
+            --head staging \
+            --title "Merge staging into main" \
+            --body "Automated PR after all checks passed." \
+            || echo "PR already exists"
