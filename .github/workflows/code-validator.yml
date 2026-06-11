@@ -54,7 +54,7 @@ jobs:
         run: mypy .
 
       - name: Semgrep Security Scan
-        run: semgrep scan --config=auto --error --timeout=120 --max-findings=100
+        run: semgrep scan --config=auto --error
 
       - name: Bandit Security Scan
         run: bandit -r .
