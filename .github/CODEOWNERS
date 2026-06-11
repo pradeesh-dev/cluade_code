@@ -1,0 +1,3 @@
+.github/CODEOWNERS
+.github/workflows/*
+.pre-commit-config.yaml
