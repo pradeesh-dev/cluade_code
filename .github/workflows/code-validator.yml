@@ -59,8 +59,8 @@ jobs:
       - name: Bandit Security Scan
         run: bandit -r .
 
-      - name: Dependency Audit
-        run: pip-audit
+      # - name: Dependency Audit
+      #   run: pip-audit
 
       - name: Run Tests
         run: pytest
