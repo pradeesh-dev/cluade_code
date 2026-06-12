@@ -1,0 +1,47 @@
+name: Claude Security Review
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  security-review:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: anthropics/claude-code-action@beta
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Act as a senior application security engineer.
+
+            Review this PR for:
+
+            1. SQL Injection
+            2. Command Injection
+            3. Path Traversal
+            4. SSRF
+            5. Hardcoded Secrets
+            6. Authentication Issues
+            7. Authorization Issues
+            8. Missing Input Validation
+            9. Dangerous File Operations
+            10. Data Loss Risks
+
+            Pay special attention to:
+            - DELETE statements
+            - DROP TABLE statements
+            - Recursive file deletion
+            - rm -rf patterns
+            - shutil.rmtree
+            - os.remove
+            - migration scripts
+
+            Leave GitHub review comments with findings.
